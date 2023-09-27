@@ -1,6 +1,7 @@
 <?php
 
-return [ // Ordered by ABC.
+// Ordered by ABC.
+return [
     'amazon' => [
         'name' => 'Amazon',
         'developers' => 'https://developer.amazon.com/apps-and-games/services-and-apis',
@@ -17,8 +18,38 @@ return [ // Ordered by ABC.
         'icon' => 'icon-apple',
         'enabled' => true,
         'sandbox' => false,
-        'form' => 'apple.phtml', // Perperation for adding ability to customized OAuth UI forms, currently handled hardcoded.
+        'form' => 'apple.phtml', // Preparation for adding ability to customized OAuth UI forms, currently handled hardcoded.
         'beta' => true,
+        'mock' => false,
+    ],
+    'auth0' => [
+        'name' => 'Auth0',
+        'developers' => 'https://auth0.com/developers',
+        'icon' => 'icon-auth0',
+        'enabled' => true,
+        'sandbox' => false,
+        'form' => 'auth0.phtml',
+        'beta' => false,
+        'mock' => false,
+    ],
+    'authentik' => [
+        'name' => 'Authentik',
+        'developers' => 'https://goauthentik.io/docs/',
+        'icon' => 'icon-authentik',
+        'enabled' => true,
+        'sandbox' => false,
+        'form' => 'authentik.phtml',
+        'beta' => false,
+        'mock' => false,
+    ],
+    'autodesk' => [
+        'name' => 'Autodesk',
+        'developers' => 'https://forge.autodesk.com/en/docs/oauth/v2/developers_guide/overview/',
+        'icon' => 'icon-autodesk',
+        'enabled' => true,
+        'sandbox' => false,
+        'form' => false,
+        'beta' => false,
         'mock' => false,
     ],
     'bitbucket' => [
@@ -51,6 +82,16 @@ return [ // Ordered by ABC.
         'beta' => false,
         'mock' => false
     ],
+    'dailymotion' => [
+        'name' => 'Dailymotion',
+        'developers' => 'https://developers.dailymotion.com/api/',
+        'icon' => 'icon-dailymotion',
+        'enabled' => true,
+        'sandbox' => false,
+        'form' => false,
+        'beta' => false,
+        'mock' => false
+    ],
     'discord' => [
         'name' => 'Discord',
         'developers' => 'https://discordapp.com/developers/docs/topics/oauth2',
@@ -61,10 +102,30 @@ return [ // Ordered by ABC.
         'beta' => false,
         'mock' => false,
     ],
+    'disqus' => [
+        'name' => 'Disqus',
+        'developers' => 'https://disqus.com/api/docs/auth/',
+        'icon' => 'icon-disqus',
+        'enabled' => true,
+        'sandbox' => false,
+        'form' => false,
+        'beta' => false,
+        'mock' => false,
+    ],
     'dropbox' => [
         'name' => 'Dropbox',
         'developers' => 'https://www.dropbox.com/developers/documentation',
         'icon' => 'icon-dropbox',
+        'enabled' => true,
+        'sandbox' => false,
+        'form' => false,
+        'beta' => false,
+        'mock' => false,
+    ],
+    'etsy' => [
+        'name' => 'Etsy',
+        'developers' => 'https://developers.etsy.com/',
+        'icon' => 'icon-etsy',
         'enabled' => true,
         'sandbox' => false,
         'form' => false,
@@ -84,7 +145,7 @@ return [ // Ordered by ABC.
     'github' => [
         'name' => 'GitHub',
         'developers' => 'https://developer.github.com/',
-        'icon' => 'icon-github-circled',
+        'icon' => 'icon-github',
         'enabled' => true,
         'sandbox' => false,
         'form' => false,
@@ -97,7 +158,7 @@ return [ // Ordered by ABC.
         'icon' => 'icon-gitlab',
         'enabled' => true,
         'sandbox' => false,
-        'form' => false,
+        'form' => 'gitlab.phtml',
         'beta' => false,
         'mock' => false,
     ],
@@ -127,7 +188,37 @@ return [ // Ordered by ABC.
         'icon' => 'icon-windows',
         'enabled' => true,
         'sandbox' => false,
+        'form' => 'microsoft.phtml',
+        'beta' => false,
+        'mock' => false,
+    ],
+    'notion' => [
+        'name' => 'Notion',
+        'developers' => 'https://developers.notion.com/docs',
+        'icon' => 'icon-notion',
+        'enabled' => true,
+        'sandbox' => false,
         'form' => false,
+        'beta' => false,
+        'mock' => false,
+    ],
+    'oidc' => [
+        'name' => 'OpenID Connect',
+        'developers' => 'https://openid.net/connect/faq/',
+        'icon' => 'icon-oidc',
+        'enabled' => true,
+        'sandbox' => false,
+        'form' => 'oidc.phtml',
+        'beta' => false,
+        'mock' => false,
+    ],
+    'okta' => [
+        'name' => 'Okta',
+        'developers' => 'https://developer.okta.com/',
+        'icon' => 'icon-okta',
+        'enabled' => true,
+        'sandbox' => false,
+        'form' => 'okta.phtml',
         'beta' => false,
         'mock' => false,
     ],
@@ -142,7 +233,7 @@ return [ // Ordered by ABC.
         'mock' => false
     ],
     'paypalSandbox' => [
-        'name' => 'PayPal',
+        'name' => 'PayPal Sandbox',
         'developers' => 'https://developer.paypal.com/docs/api/overview/',
         'icon' => 'icon-paypal',
         'enabled' => true,
@@ -150,6 +241,16 @@ return [ // Ordered by ABC.
         'form' => false,
         'beta' => false,
         'mock' => false
+    ],
+    'podio' => [
+        'name' => 'Podio',
+        'developers' => 'https://developers.podio.com/doc/oauth-authorization',
+        'icon' => 'icon-podio',
+        'enabled' => true,
+        'sandbox' => false,
+        'form' => false,
+        'beta' => false,
+        'mock' => false,
     ],
     'salesforce' => [
         'name' => 'Salesforce',
@@ -181,6 +282,16 @@ return [ // Ordered by ABC.
         'beta' => false,
         'mock' => false,
     ],
+    'stripe' => [
+        'name' => 'Stripe',
+        'developers' => 'https://stripe.com/docs/api',
+        'icon' => 'icon-stripe',
+        'enabled' => true,
+        'sandbox' => false,
+        'form' => false,
+        'beta' => false,
+        'mock' => false
+    ],
     'tradeshift' => [
         'name' => 'Tradeshift',
         'developers' => 'https://developers.tradeshift.com/docs/api',
@@ -192,7 +303,7 @@ return [ // Ordered by ABC.
         'mock' => false,
     ],
     'tradeshiftBox' => [
-        'name' => 'Tradeshift',
+        'name' => 'Tradeshift Sandbox',
         'developers' => 'https://developers.tradeshift.com/docs/api',
         'icon' => 'icon-tradeshiftbox',
         'enabled' => true,
@@ -211,15 +322,15 @@ return [ // Ordered by ABC.
         'beta' => false,
         'mock' => false,
     ],
-    'vk' => [
-        'name' => 'VK',
-        'developers' => 'https://vk.com/dev',
-        'icon' => 'icon-vk',
+    'wordpress' => [
+        'name' => 'WordPress',
+        'developers' => 'https://developer.wordpress.com/docs/oauth2/',
+        'icon' => 'icon-wordpress',
         'enabled' => true,
         'sandbox' => false,
         'form' => false,
         'beta' => false,
-        'mock' => false,
+        'mock' => false
     ],
     'yahoo' => [
         'name' => 'Yahoo',
@@ -233,7 +344,7 @@ return [ // Ordered by ABC.
     ],
     'yammer' => [
         'name' => 'Yammer',
-        'developers' => 'https://developer.yammer.com/docs/oauth-2',
+        'developers' => 'https://docs.microsoft.com/en-us/rest/api/yammer/oauth-2/',
         'icon' => 'icon-yammer',
         'enabled' => true,
         'sandbox' => false,
@@ -245,6 +356,16 @@ return [ // Ordered by ABC.
         'name' => 'Yandex',
         'developers' => 'https://tech.yandex.com/oauth/',
         'icon' => 'icon-yandex',
+        'enabled' => true,
+        'sandbox' => false,
+        'form' => false,
+        'beta' => false,
+        'mock' => false,
+    ],
+    'zoom' => [
+        'name' => 'Zoom',
+        'developers' => 'https://marketplace.zoom.us/docs/guides/auth/oauth/',
+        'icon' => 'icon-zoom',
         'enabled' => true,
         'sandbox' => false,
         'form' => false,
@@ -267,16 +388,7 @@ return [ // Ordered by ABC.
     //     'beta' => false,
     //     'mock' => false,
     // ],
-    'wordpress' => [
-        'name' => 'WordPress',
-        'developers' => 'https://developer.wordpress.com/docs/oauth2/',
-        'icon' => 'icon-wordpress',
-        'enabled' => true,
-        'sandbox' => false,
-        'form' => false,
-        'beta' => false,
-        'mock' => false
-    ],
+
     // Keep Last
     'mock' => [
         'name' => 'Mock',

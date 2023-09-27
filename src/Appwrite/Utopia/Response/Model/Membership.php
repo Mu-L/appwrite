@@ -16,11 +16,35 @@ class Membership extends Model
                 'default' => '',
                 'example' => '5e5ea5c16897e',
             ])
+            ->addRule('$createdAt', [
+                'type' => self::TYPE_DATETIME,
+                'description' => 'Membership creation date in ISO 8601 format.',
+                'default' => '',
+                'example' => self::TYPE_DATETIME_EXAMPLE,
+            ])
+            ->addRule('$updatedAt', [
+                'type' => self::TYPE_DATETIME,
+                'description' => 'Membership update date in ISO 8601 format.',
+                'default' => '',
+                'example' => self::TYPE_DATETIME_EXAMPLE,
+            ])
             ->addRule('userId', [
                 'type' => self::TYPE_STRING,
                 'description' => 'User ID.',
                 'default' => '',
                 'example' => '5e5ea5c16897e',
+            ])
+            ->addRule('userName', [
+                'type' => self::TYPE_STRING,
+                'description' => 'User name.',
+                'default' => '',
+                'example' => 'John Doe',
+            ])
+            ->addRule('userEmail', [
+                'type' => self::TYPE_STRING,
+                'description' => 'User email address.',
+                'default' => '',
+                'example' => 'john@appwrite.io',
             ])
             ->addRule('teamId', [
                 'type' => self::TYPE_STRING,
@@ -28,29 +52,23 @@ class Membership extends Model
                 'default' => '',
                 'example' => '5e5ea5c16897e',
             ])
-            ->addRule('name', [
+            ->addRule('teamName', [
                 'type' => self::TYPE_STRING,
-                'description' => 'User name.',
+                'description' => 'Team name.',
                 'default' => '',
                 'example' => 'VIP',
             ])
-            ->addRule('email', [
-                'type' => self::TYPE_STRING,
-                'description' => 'User email address.',
-                'default' => '',
-                'example' => 'john@appwrite.io',
-            ])
             ->addRule('invited', [
-                'type' => self::TYPE_INTEGER,
-                'description' => 'Date, the user has been invited to join the team in Unix timestamp.',
-                'default' => 0,
-                'example' => 1592981250,
+                'type' => self::TYPE_DATETIME,
+                'description' => 'Date, the user has been invited to join the team in ISO 8601 format.',
+                'default' => '',
+                'example' => self::TYPE_DATETIME_EXAMPLE,
             ])
             ->addRule('joined', [
-                'type' => self::TYPE_INTEGER,
-                'description' => 'Date, the user has accepted the invitation to join the team in Unix timestamp.',
-                'default' => 0,
-                'example' => 1592981250,
+                'type' => self::TYPE_DATETIME,
+                'description' => 'Date, the user has accepted the invitation to join the team in ISO 8601 format.',
+                'default' => '',
+                'example' => self::TYPE_DATETIME_EXAMPLE,
             ])
             ->addRule('confirm', [
                 'type' => self::TYPE_BOOLEAN,
@@ -62,7 +80,7 @@ class Membership extends Model
                 'type' => self::TYPE_STRING,
                 'description' => 'User list of roles',
                 'default' => [],
-                'example' => 'admin',
+                'example' => ['owner'],
                 'array' => true,
             ])
         ;
@@ -73,17 +91,17 @@ class Membership extends Model
      *
      * @return string
      */
-    public function getName():string
+    public function getName(): string
     {
         return 'Membership';
     }
 
     /**
-     * Get Collection
+     * Get Type
      *
      * @return string
      */
-    public function getType():string
+    public function getType(): string
     {
         return Response::MODEL_MEMBERSHIP;
     }

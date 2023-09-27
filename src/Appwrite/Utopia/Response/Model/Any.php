@@ -10,24 +10,24 @@ class Any extends Model
     /**
      * @var bool
      */
-    protected $any = true;
+    protected bool $any = true;
 
     /**
      * Get Name
      *
      * @return string
      */
-    public function getName():string
+    public function getName(): string
     {
         return 'Any';
     }
 
     /**
-     * Get Collection
+     * Get Type
      *
      * @return string
      */
-    public function getType():string
+    public function getType(): string
     {
         return Response::MODEL_ANY;
     }

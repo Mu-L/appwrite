@@ -12,12 +12,17 @@ class Yammer extends OAuth2
     /**
      * @var string
      */
-    private $endpoint = 'https://www.yammer.com/oauth2/';
+    private string $endpoint = 'https://www.yammer.com/oauth2/';
 
     /**
      * @var array
      */
-    protected $user = [];
+    protected array $user = [];
+
+    /**
+     * @var array
+     */
+    protected array $tokens = [];
 
     /**
      * @return string
@@ -32,43 +37,65 @@ class Yammer extends OAuth2
      */
     public function getLoginURL(): string
     {
-        return $this->endpoint . 'oauth2/authorize?'.
-        \http_build_query([
-            'client_id' => $this->appID,
-            'response_type' => 'code',
-            'redirect_uri' => $this->callback,
-            'state' => \json_encode($this->state)
-        ]);
+        return $this->endpoint . 'oauth2/authorize?' .
+            \http_build_query([
+                'client_id' => $this->appID,
+                'response_type' => 'code',
+                'redirect_uri' => $this->callback,
+                'state' => \json_encode($this->state)
+            ]);
     }
 
     /**
      * @param string $code
      *
-     * @return string
+     * @return array
      */
-    public function getAccessToken(string $code): string
+    protected function getTokens(string $code): array
+    {
+        if (empty($this->tokens)) {
+            $headers = ['Content-Type: application/x-www-form-urlencoded'];
+            $this->tokens = \json_decode($this->request(
+                'POST',
+                $this->endpoint . 'access_token?',
+                $headers,
+                \http_build_query([
+                    'client_id' => $this->appID,
+                    'client_secret' => $this->appSecret,
+                    'code' => $code,
+                    'grant_type' => 'authorization_code'
+                ])
+            ), true);
+        }
+
+        return $this->tokens;
+    }
+
+    /**
+     * @param string $refreshToken
+     *
+     * @return array
+     */
+    public function refreshTokens(string $refreshToken): array
     {
         $headers = ['Content-Type: application/x-www-form-urlencoded'];
-
-        $accessToken = $this->request(
+        $this->tokens = \json_decode($this->request(
             'POST',
             $this->endpoint . 'access_token?',
             $headers,
             \http_build_query([
                 'client_id' => $this->appID,
                 'client_secret' => $this->appSecret,
-                'code' => $code,
-                'grant_type' => 'authorization_code'
+                'refresh_token' => $refreshToken,
+                'grant_type' => 'refresh_token'
             ])
-        );
+        ), true);
 
-        $accessToken = \json_decode($accessToken, true);
-
-        if (isset($accessToken['access_token']['token'])) {
-            return $accessToken['access_token']['token'];
+        if (empty($this->tokens['refresh_token'])) {
+            $this->tokens['refresh_token'] = $refreshToken;
         }
 
-        return '';
+        return $this->tokens;
     }
 
     /**
@@ -80,11 +107,7 @@ class Yammer extends OAuth2
     {
         $user = $this->getUser($accessToken);
 
-        if (isset($user['id'])) {
-            return $user['id'];
-        }
-
-        return '';
+        return $user['id'] ?? '';
     }
 
     /**
@@ -96,11 +119,23 @@ class Yammer extends OAuth2
     {
         $user = $this->getUser($accessToken);
 
-        if (isset($user['email'])) {
-            return $user['email'];
-        }
-        
-        return '';
+        return $user['email'] ?? '';
+    }
+
+    /**
+     * Check if the OAuth email is verified
+     *
+     * If present, the email is verified. This was verfied through a manual Yammer sign up process
+     *
+     * @param string $accessToken
+     *
+     * @return bool
+     */
+    public function isEmailVerified(string $accessToken): bool
+    {
+        $email = $this->getUserEmail($accessToken);
+
+        return !empty($email);
     }
 
     /**
@@ -112,11 +147,7 @@ class Yammer extends OAuth2
     {
         $user = $this->getUser($accessToken);
 
-        if (isset($user['full_name'])) {
-            return $user['full_name'];
-        }
-        
-        return '';
+        return $user['full_name'] ?? '';
     }
 
     /**
@@ -127,7 +158,7 @@ class Yammer extends OAuth2
     protected function getUser(string $accessToken): array
     {
         if (empty($this->user)) {
-            $headers = ['Authorization: Bearer '. \urlencode($accessToken)];
+            $headers = ['Authorization: Bearer ' . \urlencode($accessToken)];
             $user = $this->request('GET', 'https://www.yammer.com/api/v1/users/current.json', $headers);
             $this->user = \json_decode($user, true);
         }

@@ -2,6 +2,7 @@
 
 namespace Appwrite\Network\Validator;
 
+use Utopia\Validator\Hostname;
 use Utopia\Validator;
 
 class Origin extends Validator
@@ -13,15 +14,22 @@ class Origin extends Validator
     public const CLIENT_TYPE_FLUTTER_MACOS = 'flutter-macos';
     public const CLIENT_TYPE_FLUTTER_WINDOWS = 'flutter-windows';
     public const CLIENT_TYPE_FLUTTER_LINUX = 'flutter-linux';
+    public const CLIENT_TYPE_FLUTTER_WEB = 'flutter-web';
+    public const CLIENT_TYPE_APPLE_IOS = 'apple-ios';
+    public const CLIENT_TYPE_APPLE_MACOS = 'apple-macos';
+    public const CLIENT_TYPE_APPLE_WATCHOS = 'apple-watchos';
+    public const CLIENT_TYPE_APPLE_TVOS = 'apple-tvos';
     public const CLIENT_TYPE_ANDROID = 'android';
-    public const CLIENT_TYPE_IOS = 'ios';
+    public const CLIENT_TYPE_UNITY = 'unity';
 
 
     public const SCHEME_TYPE_HTTP = 'http';
     public const SCHEME_TYPE_HTTPS = 'https';
     public const SCHEME_TYPE_IOS = 'appwrite-ios';
-    public const SCHEME_TYPE_ANDROID = 'appwrite-android';
     public const SCHEME_TYPE_MACOS = 'appwrite-macos';
+    public const SCHEME_TYPE_WATCHOS = 'appwrite-watchos';
+    public const SCHEME_TYPE_TVOS = 'appwrite-tvos';
+    public const SCHEME_TYPE_ANDROID = 'appwrite-android';
     public const SCHEME_TYPE_WINDOWS = 'appwrite-windows';
     public const SCHEME_TYPE_LINUX = 'appwrite-linux';
 
@@ -32,8 +40,10 @@ class Origin extends Validator
         self::SCHEME_TYPE_HTTP => 'Web',
         self::SCHEME_TYPE_HTTPS => 'Web',
         self::SCHEME_TYPE_IOS => 'iOS',
-        self::SCHEME_TYPE_ANDROID => 'Android',
         self::SCHEME_TYPE_MACOS => 'macOS',
+        self::SCHEME_TYPE_WATCHOS => 'watchOS',
+        self::SCHEME_TYPE_TVOS => 'tvOS',
+        self::SCHEME_TYPE_ANDROID => 'Android',
         self::SCHEME_TYPE_WINDOWS => 'Windows',
         self::SCHEME_TYPE_LINUX => 'Linux',
     ];
@@ -64,6 +74,7 @@ class Origin extends Validator
 
             switch ($type) {
                 case self::CLIENT_TYPE_WEB:
+                case self::CLIENT_TYPE_FLUTTER_WEB:
                     $this->clients[] = (isset($platform['hostname'])) ? $platform['hostname'] : '';
                     break;
 
@@ -73,7 +84,10 @@ class Origin extends Validator
                 case self::CLIENT_TYPE_FLUTTER_WINDOWS:
                 case self::CLIENT_TYPE_FLUTTER_LINUX:
                 case self::CLIENT_TYPE_ANDROID:
-                case self::CLIENT_TYPE_IOS:
+                case self::CLIENT_TYPE_APPLE_IOS:
+                case self::CLIENT_TYPE_APPLE_MACOS:
+                case self::CLIENT_TYPE_APPLE_WATCHOS:
+                case self::CLIENT_TYPE_APPLE_TVOS:
                     $this->clients[] = (isset($platform['key'])) ? $platform['key'] : '';
                     break;
 
@@ -84,14 +98,14 @@ class Origin extends Validator
         }
     }
 
-    public function getDescription()
+    public function getDescription(): string
     {
         if (!\array_key_exists($this->client, $this->platforms)) {
             return 'Unsupported platform';
         }
 
-        return 'Invalid Origin. Register your new client ('.$this->host.') as a new '
-            .$this->platforms[$this->client].' platform on your project console dashboard';
+        return 'Invalid Origin. Register your new client (' . $this->host . ') as a new '
+            . $this->platforms[$this->client] . ' platform on your project console dashboard';
     }
 
     /**
@@ -102,7 +116,7 @@ class Origin extends Validator
      *
      * @return bool
      */
-    public function isValid($origin)
+    public function isValid($origin): bool
     {
         if (!is_string($origin)) {
             return false;
@@ -118,11 +132,9 @@ class Origin extends Validator
             return true;
         }
 
-        if (\in_array($host, $this->clients)) {
-            return true;
-        }
+        $validator = new Hostname($this->clients);
 
-        return false;
+        return $validator->isValid($host);
     }
 
     /**

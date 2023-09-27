@@ -3,9 +3,11 @@
 use Appwrite\Auth\Auth;
 
 $member = [
+    'global',
     'public',
     'home',
     'console',
+    'graphql',
     'account',
     'teams.read',
     'teams.write',
@@ -19,25 +21,30 @@ $member = [
     'avatars.read',
     'execution.read',
     'execution.write',
+    'assistant.read',
 ];
 
 $admins = [
+    'global',
+    'graphql',
     'teams.read',
     'teams.write',
     'documents.read',
     'documents.write',
     'files.read',
     'files.write',
+    'buckets.read',
+    'buckets.write',
     'users.read',
     'users.write',
+    'databases.read',
+    'databases.write',
     'collections.read',
     'collections.write',
     'platforms.read',
     'platforms.write',
     'keys.read',
     'keys.write',
-    'tasks.read',
-    'tasks.write',
     'webhooks.read',
     'webhooks.write',
     'locale.read',
@@ -47,39 +54,50 @@ $admins = [
     'functions.write',
     'execution.read',
     'execution.write',
+    'rules.read',
+    'rules.write',
+    'migrations.read',
+    'migrations.write',
+    'vcs.read',
+    'vcs.write',
 ];
 
 return [
-    Auth::USER_ROLE_GUEST => [
-        'label' => 'Guest',
+    Auth::USER_ROLE_GUESTS => [
+        'label' => 'Guests',
         'scopes' => [
+            'global',
             'public',
             'home',
             'console',
+            'graphql',
             'documents.read',
+            'documents.write',
             'files.read',
+            'files.write',
             'locale.read',
             'avatars.read',
+            'execution.write',
         ],
     ],
-    Auth::USER_ROLE_MEMBER => [
-        'label' => 'Member',
-        'scopes' => \array_merge($member, []),
+    Auth::USER_ROLE_USERS => [
+        'label' => 'Users',
+        'scopes' => \array_merge($member),
     ],
     Auth::USER_ROLE_ADMIN => [
         'label' => 'Admin',
-        'scopes' => \array_merge($admins, []),
+        'scopes' => \array_merge($admins),
     ],
     Auth::USER_ROLE_DEVELOPER => [
         'label' => 'Developer',
-        'scopes' => \array_merge($admins, []),
+        'scopes' => \array_merge($admins),
     ],
     Auth::USER_ROLE_OWNER => [
         'label' => 'Owner',
-        'scopes' => \array_merge($member, $admins, []),
+        'scopes' => \array_merge($member, $admins),
     ],
-    Auth::USER_ROLE_APP => [
-        'label' => 'Application',
-        'scopes' => ['health.read'],
+    Auth::USER_ROLE_APPS => [
+        'label' => 'Applications',
+        'scopes' => ['global', 'health.read', 'graphql'],
     ],
 ];

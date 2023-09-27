@@ -4,6 +4,8 @@ namespace Appwrite\Utopia\Response\Model;
 
 use Appwrite\Utopia\Response;
 use Appwrite\Utopia\Response\Model;
+use stdClass;
+use Utopia\Database\Document;
 
 class Rule extends Model
 {
@@ -16,53 +18,54 @@ class Rule extends Model
                 'default' => '',
                 'example' => '5e5ea5c16897e',
             ])
-            ->addRule('$collection', [ // TODO remove this from public response
-                'type' => self::TYPE_STRING,
-                'description' => 'Rule Collection.',
-                'example' => '5e5e66c16897e',
-            ])
-            ->addRule('type', [
-                'type' => self::TYPE_STRING,
-                'description' => 'Rule type. Possible values: ',
+            ->addRule('$createdAt', [
+                'type' => self::TYPE_DATETIME,
+                'description' => 'Rule creation date in ISO 8601 format.',
                 'default' => '',
-                'example' => 'title',
+                'example' => self::TYPE_DATETIME_EXAMPLE,
             ])
-            ->addRule('key', [
-                'type' => self::TYPE_STRING,
-                'description' => 'Rule key.',
+            ->addRule('$updatedAt', [
+                'type' => self::TYPE_DATETIME,
+                'description' => 'Rule update date in ISO 8601 format.',
                 'default' => '',
-                'example' => 'title',
+                'example' => self::TYPE_DATETIME_EXAMPLE,
             ])
-            ->addRule('label', [
+            ->addRule('domain', [
                 'type' => self::TYPE_STRING,
-                'description' => 'Rule label.',
+                'description' => 'Domain name.',
                 'default' => '',
-                'example' => 'Title',
+                'example' => 'appwrite.company.com',
             ])
-            ->addRule('default', [ // TODO should be of mixed types
+            ->addRule('resourceType', [
                 'type' => self::TYPE_STRING,
-                'description' => 'Rule default value.',
+                'description' => 'Action definition for the rule. Possible values are "api", "function", or "redirect"',
                 'default' => '',
-                'example' => 'Movie Name',
+                'example' => 'function',
             ])
-            ->addRule('array', [
-                'type' => self::TYPE_BOOLEAN,
-                'description' => 'Is array?',
+            ->addRule('resourceId', [
+                'type' => self::TYPE_STRING,
+                'description' => 'ID of resource for the action type. If resourceType is "api" or "url", it is empty. If resourceType is "function", it is ID of the function.',
+                'default' => '',
+                'example' => 'myAwesomeFunction',
+            ])
+            ->addRule('status', [
+                'type' => self::TYPE_STRING,
+                'description' => 'Domain verification status. Possible values are "created", "verifying", "verified" and "unverified"',
                 'default' => false,
-                'example' => false,
+                'example' => 'verified',
             ])
-            ->addRule('required', [
-                'type' => self::TYPE_BOOLEAN,
-                'description' => 'Is required?',
-                'default' => false,
-                'example' => true,
-            ])
-            ->addRule('list', [
+            ->addRule('logs', [
                 'type' => self::TYPE_STRING,
-                'description' => 'List of allowed values',
-                'array' => true,
-                'default' => [],
-                'example' => '5e5ea5c168099',
+                'description' => 'Certificate generation logs. This will return an empty string if generation did not run, or succeeded.',
+                'default' => '',
+                'example' => 'HTTP challegne failed.',
+            ])
+            ->addRule('renewAt', [
+                'type' => self::TYPE_DATETIME,
+                'description' => 'Certificate auto-renewal date in ISO 8601 format.',
+                'default' => APP_DATABASE_ATTRIBUTE_DATETIME,
+                'example' => APP_DATABASE_ATTRIBUTE_DATETIME,
+                'array' => false,
             ])
         ;
     }
@@ -72,18 +75,18 @@ class Rule extends Model
      *
      * @return string
      */
-    public function getName():string
+    public function getName(): string
     {
         return 'Rule';
     }
 
     /**
-     * Get Collection
+     * Get Type
      *
      * @return string
      */
-    public function getType():string
+    public function getType(): string
     {
-        return Response::MODEL_RULE;
+        return Response::MODEL_PROXY_RULE;
     }
 }

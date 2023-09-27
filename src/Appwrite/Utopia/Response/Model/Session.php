@@ -16,6 +16,12 @@ class Session extends Model
                 'default' => '',
                 'example' => '5e5ea5c16897e',
             ])
+            ->addRule('$createdAt', [
+                'type' => self::TYPE_DATETIME,
+                'description' => 'Session creation date in ISO 8601 format.',
+                'default' => '',
+                'example' => self::TYPE_DATETIME_EXAMPLE,
+            ])
             ->addRule('userId', [
                 'type' => self::TYPE_STRING,
                 'description' => 'User ID.',
@@ -23,10 +29,10 @@ class Session extends Model
                 'example' => '5e5bb8c16897e',
             ])
             ->addRule('expire', [
-                'type' => self::TYPE_INTEGER,
-                'description' => 'Session expiration date in Unix timestamp.',
-                'default' => 0,
-                'example' => 1592981250,
+                'type' => self::TYPE_DATETIME,
+                'description' => 'Session expiration date in ISO 8601 format.',
+                'default' => '',
+                'example' => self::TYPE_DATETIME_EXAMPLE,
             ])
             ->addRule('provider', [
                 'type' => self::TYPE_STRING,
@@ -40,9 +46,21 @@ class Session extends Model
                 'default' => '',
                 'example' => 'user@example.com',
             ])
-            ->addRule('providerToken', [
+            ->addRule('providerAccessToken', [
                 'type' => self::TYPE_STRING,
-                'description' => 'Session Provider Token.',
+                'description' => 'Session Provider Access Token.',
+                'default' => '',
+                'example' => 'MTQ0NjJkZmQ5OTM2NDE1ZTZjNGZmZjI3',
+            ])
+            ->addRule('providerAccessTokenExpiry', [
+                'type' => self::TYPE_DATETIME,
+                'description' => 'The date of when the access token expires in ISO 8601 format.',
+                'default' => '',
+                'example' => self::TYPE_DATETIME_EXAMPLE,
+            ])
+            ->addRule('providerRefreshToken', [
+                'type' => self::TYPE_STRING,
+                'description' => 'Session Provider Refresh Token.',
                 'default' => '',
                 'example' => 'MTQ0NjJkZmQ5OTM2NDE1ZTZjNGZmZjI3',
             ])
@@ -150,17 +168,17 @@ class Session extends Model
      *
      * @return string
      */
-    public function getName():string
+    public function getName(): string
     {
         return 'Session';
     }
 
     /**
-     * Get Collection
+     * Get Type
      *
      * @return string
      */
-    public function getType():string
+    public function getType(): string
     {
         return Response::MODEL_SESSION;
     }

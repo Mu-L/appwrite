@@ -16,6 +16,12 @@ class Token extends Model
                 'default' => '',
                 'example' => 'bb8ea5c16897e',
             ])
+            ->addRule('$createdAt', [
+                'type' => self::TYPE_DATETIME,
+                'description' => 'Token creation date in ISO 8601 format.',
+                'default' => '',
+                'example' => self::TYPE_DATETIME_EXAMPLE,
+            ])
             ->addRule('userId', [
                 'type' => self::TYPE_STRING,
                 'description' => 'User ID.',
@@ -29,10 +35,10 @@ class Token extends Model
                 'example' => '',
             ])
             ->addRule('expire', [
-                'type' => self::TYPE_INTEGER,
-                'description' => 'Token expiration date in Unix timestamp.',
-                'default' => 0,
-                'example' => 1592981250,
+                'type' => self::TYPE_DATETIME,
+                'description' => 'Token expiration date in ISO 8601 format.',
+                'default' => '',
+                'example' => self::TYPE_DATETIME_EXAMPLE,
             ])
         ;
     }
@@ -42,17 +48,17 @@ class Token extends Model
      *
      * @return string
      */
-    public function getName():string
+    public function getName(): string
     {
         return 'Token';
     }
 
     /**
-     * Get Collection
+     * Get Type
      *
      * @return string
      */
-    public function getType():string
+    public function getType(): string
     {
         return Response::MODEL_TOKEN;
     }

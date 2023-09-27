@@ -2,28 +2,22 @@
 
 namespace Tests\E2E\Scopes;
 
+use Appwrite\Tests\Retryable;
 use Tests\E2E\Client;
 use PHPUnit\Framework\TestCase;
+use Utopia\Database\Helpers\ID;
 
 abstract class Scope extends TestCase
 {
-    /**
-     * @var Client
-     */
-    protected $client = null;
+    use Retryable;
 
-    /**
-     * @var string
-     */
-    protected $endpoint = 'http://localhost/v1';
+    protected ?Client $client = null;
+    protected string $endpoint = 'http://localhost/v1';
 
     protected function setUp(): void
     {
         $this->client = new Client();
-
-        $this->client
-            ->setEndpoint($this->endpoint)
-        ;
+        $this->client->setEndpoint($this->endpoint);
     }
 
     protected function tearDown(): void
@@ -31,10 +25,10 @@ abstract class Scope extends TestCase
         $this->client = null;
     }
 
-    protected function getLastEmail():array
+    protected function getLastEmail(): array
     {
-        sleep(10);
-        
+        sleep(3);
+
         $emails = json_decode(file_get_contents('http://maildev:1080/email'), true);
 
         if ($emails && is_array($emails)) {
@@ -44,25 +38,25 @@ abstract class Scope extends TestCase
         return [];
     }
 
-    protected function getLastRequest():array
+    protected function getLastRequest(): array
     {
-        sleep(5);
-        
-        $resquest = json_decode(file_get_contents('http://request-catcher:5000/__last_request__'), true);
-        $resquest['data'] = json_decode($resquest['data'], true);
-        
-        return $resquest;
+        sleep(2);
+
+        $request = json_decode(file_get_contents('http://request-catcher:5000/__last_request__'), true);
+        $request['data'] = json_decode($request['data'], true);
+
+        return $request;
     }
 
     /**
      * @return array
      */
-    abstract public function getHeaders():array;
+    abstract public function getHeaders(): array;
 
     /**
      * @return array
      */
-    abstract public function getProject():array;
+    abstract public function getProject(): array;
 
     /**
      * @var array
@@ -78,7 +72,7 @@ abstract class Scope extends TestCase
             return self::$root;
         }
 
-        $email = uniqid().'user@localhost.test';
+        $email = uniqid() . 'user@localhost.test';
         $password = 'password';
         $name = 'User Name';
 
@@ -87,6 +81,7 @@ abstract class Scope extends TestCase
             'content-type' => 'application/json',
             'x-appwrite-project' => 'console',
         ], [
+            'userId' => ID::unique(),
             'email' => $email,
             'password' => $password,
             'name' => $name,
@@ -94,7 +89,7 @@ abstract class Scope extends TestCase
 
         $this->assertEquals(201, $root['headers']['status-code']);
 
-        $session = $this->client->call(Client::METHOD_POST, '/account/sessions', [
+        $session = $this->client->call(Client::METHOD_POST, '/account/sessions/email', [
             'origin' => 'http://localhost',
             'content-type' => 'application/json',
             'x-appwrite-project' => 'console',
@@ -106,7 +101,7 @@ abstract class Scope extends TestCase
         $session = $this->client->parseCookie((string)$session['headers']['set-cookie'])['a_session_console'];
 
         self::$root = [
-            '$id' => $root['body']['$id'],
+            '$id' => ID::custom($root['body']['$id']),
             'name' => $root['body']['name'],
             'email' => $root['body']['email'],
             'session' => $session,
@@ -129,7 +124,7 @@ abstract class Scope extends TestCase
             return self::$user[$this->getProject()['$id']];
         }
 
-        $email = uniqid().'user@localhost.test';
+        $email = uniqid() . 'user@localhost.test';
         $password = 'password';
         $name = 'User Name';
 
@@ -138,6 +133,7 @@ abstract class Scope extends TestCase
             'content-type' => 'application/json',
             'x-appwrite-project' => $this->getProject()['$id'],
         ], [
+            'userId' => ID::unique(),
             'email' => $email,
             'password' => $password,
             'name' => $name,
@@ -145,7 +141,7 @@ abstract class Scope extends TestCase
 
         $this->assertEquals(201, $user['headers']['status-code']);
 
-        $session = $this->client->call(Client::METHOD_POST, '/account/sessions', [
+        $session = $this->client->call(Client::METHOD_POST, '/account/sessions/email', [
             'origin' => 'http://localhost',
             'content-type' => 'application/json',
             'x-appwrite-project' => $this->getProject()['$id'],
@@ -154,13 +150,14 @@ abstract class Scope extends TestCase
             'password' => $password,
         ]);
 
-        $session = $this->client->parseCookie((string)$session['headers']['set-cookie'])['a_session_'.$this->getProject()['$id']];
+        $token = $this->client->parseCookie((string)$session['headers']['set-cookie'])['a_session_' . $this->getProject()['$id']];
 
         self::$user[$this->getProject()['$id']] = [
-            '$id' => $user['body']['$id'],
+            '$id' => ID::custom($user['body']['$id']),
             'name' => $user['body']['name'],
             'email' => $user['body']['email'],
-            'session' => $session,
+            'session' => $token,
+            'sessionId' => $session['body']['$id'],
         ];
 
         return self::$user[$this->getProject()['$id']];

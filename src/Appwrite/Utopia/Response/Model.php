@@ -2,47 +2,68 @@
 
 namespace Appwrite\Utopia\Response;
 
+use Utopia\Database\Document;
+
 abstract class Model
 {
-    const TYPE_STRING = 'string';
-    const TYPE_INTEGER = 'integer';
-    const TYPE_FLOAT = 'float';
-    const TYPE_BOOLEAN = 'boolean';
-    const TYPE_JSON = 'json';
+    public const TYPE_STRING = 'string';
+    public const TYPE_INTEGER = 'integer';
+    public const TYPE_FLOAT = 'double';
+    public const TYPE_BOOLEAN = 'boolean';
+    public const TYPE_JSON = 'json';
+    public const TYPE_DATETIME = 'datetime';
+    public const TYPE_DATETIME_EXAMPLE = '2020-10-15T06:38:00.000+00:00';
+    public const TYPE_RELATIONSHIP = 'relationship';
 
     /**
      * @var bool
      */
-    protected $none = false;
+    protected bool $none = false;
 
     /**
      * @var bool
      */
-    protected $any = false;
+    protected bool $any = false;
 
     /**
      * @var bool
      */
-    protected $public = true;
+    protected bool $public = true;
 
     /**
      * @var array
      */
-    protected $rules = [];
+    protected array $rules = [];
+
+    /**
+     * @var array
+     */
+    public array $conditions = [];
+
+
+    /**
+     * Filter Document Structure
+     *
+     * @return Document
+     */
+    public function filter(Document $document): Document
+    {
+        return $document;
+    }
 
     /**
      * Get Name
      *
      * @return string
      */
-    abstract public function getName():string;
+    abstract public function getName(): string;
 
     /**
      * Get Collection
      *
      * @return string
      */
-    abstract public function getType():string;
+    abstract public function getType(): string;
 
     /**
      * Get Rules
@@ -56,27 +77,49 @@ abstract class Model
 
     /**
      * Add a New Rule
+     * If rule is an array of documents with varying models
+     *
+     * @param string $key
+     * @param array $options
+     * @return Model
      */
     protected function addRule(string $key, array $options): self
     {
         $this->rules[$key] = array_merge([
-            'require' => true,
-            'type' => '',
-            'description' => '',
-            'default' => null,
-            'example' => '',
+            'required' => true,
             'array' => false,
+            'description' => '',
+            'example' => ''
         ], $options);
 
         return $this;
     }
 
-    public function getRequired()
+    /**
+     * Delete an existing Rule
+     * If rule exists, it will be removed
+     *
+     * @param string $key
+     * @return Model
+     */
+    protected function removeRule(string $key): self
+    {
+        if (isset($this->rules[$key])) {
+            unset($this->rules[$key]);
+        }
+
+        return $this;
+    }
+
+    /**
+     * @return array
+     */
+    public function getRequired(): array
     {
         $list = [];
 
         foreach ($this->rules as $key => $rule) {
-            if (isset($rule['require']) || $rule['require']) {
+            if ($rule['required'] ?? false) {
                 $list[] = $key;
             }
         }

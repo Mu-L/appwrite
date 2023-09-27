@@ -3,14 +3,13 @@
 Init your Appwrite client:
 
 ```dart
-  Client client = Client();
+Client client = Client();
 
-  client
-      .setEndpoint('https://localhost/v1') // Your Appwrite Endpoint
-      .setProject('5e8cf4f46b5e8') // Your project ID
-      .setSelfSigned() // Remove in production
-  ;
-
+client
+    .setEndpoint('https://localhost/v1') // Your Appwrite Endpoint
+    .setProject('5e8cf4f46b5e8') // Your project ID
+    .setSelfSigned() // Remove in production
+;
 ```
 
 Create a new user:
@@ -18,11 +17,11 @@ Create a new user:
 ```dart
 Users users = Users(client);
 
-Response result = await users.create(
+User result = await users.create(
+    userId: '[USER_ID]',
     email: 'email@example.com',
     password: 'password',
 );
- 
 ```
 
 Fetch user profile:
@@ -30,7 +29,7 @@ Fetch user profile:
 ```dart
 Users users = Users(client);
 
-Response profile = await users.get(
+User profile = await users.get(
     userId: '[USER_ID]',
 );
 ```
@@ -40,12 +39,15 @@ Upload File:
 ```dart
 Storage storage = Storage(client);
 
-MultipartFile file = MultipartFile.fromFile('./path-to-file/image.jpg', filename: 'image.jpg');
+InputFile file = InputFile(path: './path-to-file/image.jpg', filename: 'image.jpg');
 
 storage.createFile(
+    bucketId: '[BUCKET_ID]',
+    fileId: '[FILE_ID]', // use 'unique()' to automatically generate a unique ID
     file: file,
-    read: ['*'],
-    write: []
+    permissions: [
+      Permission.read(Role.any()),
+    ],
 )
 .then((response) {
     print(response); // File uploaded!

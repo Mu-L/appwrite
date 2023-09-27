@@ -51,6 +51,7 @@ When trying to connect to Appwrite from an emulator or a mobile device, localhos
 // Register User
 val account = Account(client)
 val response = account.create(
+    ID.unique(),
     "email@example.com", 
     "password"
 )
@@ -61,6 +62,7 @@ val response = account.create(
 ```kotlin
 import io.appwrite.Client
 import io.appwrite.services.Account
+import io.appwrite.ID
 
 val client = Client(context)
   .setEndpoint("https://[HOSTNAME_OR_IP]/v1") // Your API Endpoint
@@ -68,7 +70,8 @@ val client = Client(context)
   .setSelfSigned(true) // Remove in production
 
 val account = Account(client)
-val response = account.create(
+val user = account.create(
+    ID.unique(),
     "email@example.com", 
     "password"
 )
@@ -79,10 +82,10 @@ The Appwrite Android SDK raises an `AppwriteException` object with `message`, `c
 
 ```kotlin
 try {
-    var response = account.create("email@example.com", "password")
-    Log.d("Appwrite response", response.body?.string())
+    var user = account.create(ID.unique(), "email@example.com", "password")
+    Log.d("Appwrite user", user.toMap())
 } catch(e : AppwriteException) {
-    Log.e("AppwriteException",e.message.toString())
+    e.printStackTrace()
 }
 ```
 

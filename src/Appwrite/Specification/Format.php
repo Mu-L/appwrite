@@ -3,45 +3,28 @@
 namespace Appwrite\Specification;
 
 use Utopia\App;
+use Utopia\Config\Config;
 use Utopia\Route;
 use Appwrite\Utopia\Response\Model;
 
 abstract class Format
 {
-    /**
-     * @var App
-     */
-    protected $app;
-    
-    /**
-     * @var array
-     */
-    protected $services;
-    
+    protected App $app;
+
     /**
      * @var Route[]
      */
-    protected $routes;
-    
+    protected array $routes;
+
     /**
      * @var Model[]
      */
-    protected $models;
-    
-    /**
-     * @var array
-     */
-    protected $keys;
-    
-    /**
-     * @var int
-     */
-    protected $authCount;
-    
-    /**
-     * @var array
-     */
-    protected $params = [
+    protected array $models;
+
+    protected array $services;
+    protected array $keys;
+    protected int $authCount;
+    protected array $params = [
         'name' => '',
         'description' => '',
         'endpoint' => 'https://localhost',
@@ -56,14 +39,17 @@ abstract class Format
         'license.url' => '',
     ];
 
-    /**
-     * @param App $app
-     * @param array $services
-     * @param Route[] $routes
-     * @param Model[] $models
-     * @param array $keys
-     * @param int $authCount
+    /*
+     * Blacklist to omit the enum types for the given route's parameter
      */
+    protected array $enumBlacklist = [
+        [
+            'namespace' => 'users',
+            'method' => 'getUsage',
+            'parameter' => 'provider'
+        ]
+    ];
+
     public function __construct(App $app, array $services, array $routes, array $models, array $keys, int $authCount)
     {
         $this->app = $app;
@@ -99,7 +85,7 @@ abstract class Format
      *
      * @param string $key
      * @param string $value
-     * 
+     *
      * @return self
      */
     public function setParam(string $key, string $value): self
@@ -116,16 +102,148 @@ abstract class Format
      *
      * @param string $key
      * @param string $default
-     * 
+     *
      * @return string
      */
     public function getParam(string $key, string $default = ''): string
     {
-        if(!isset($this->params[$key])) {
-            return $default;
-        }
-
-        return $this->params[$key];
+        return $this->params[$key] ?? $default;
     }
 
+    protected function getEnumName(string $service, string $method, string $param): ?string
+    {
+        switch ($service) {
+            case 'account':
+                switch ($method) {
+                    case 'createOAuth2Session':
+                        return 'Provider';
+                }
+                break;
+            case 'avatars':
+                switch ($method) {
+                    case 'getBrowser':
+                        return 'Browser';
+                    case 'getCreditCard':
+                        return 'CreditCard';
+                    case 'getFlag':
+                        return  'Flag';
+                }
+                break;
+            case 'storage':
+                switch ($method) {
+                    case 'getFilePreview':
+                        switch ($param) {
+                            case 'gravity':
+                                return 'ImageGravity';
+                            case 'output':
+                                return  'ImageFormat';
+                        }
+                        break;
+                }
+                break;
+            case 'databases':
+                switch ($method) {
+                    case 'createRelationshipAttribute':
+                        switch ($param) {
+                            case 'type':
+                                return 'RelationshipType';
+                            case 'onDelete':
+                                return 'RelationMutate';
+                        }
+                        break;
+                    case 'updateRelationshipAttribute':
+                        switch ($param) {
+                            case 'onDelete':
+                                return 'RelationMutate';
+                        }
+                        break;
+                    case 'createIndex':
+                        switch ($param) {
+                            case 'type':
+                                return 'IndexType';
+                            case 'orders':
+                                return 'OrderBy';
+                        }
+                }
+                break;
+            case 'projects':
+                switch ($method) {
+                    case 'createPlatform':
+                        switch ($param) {
+                            case 'type':
+                                return 'PlatformType';
+                        }
+                        break;
+                }
+                break;
+        }
+        return null;
+    }
+    public function getEnumKeys(string $service, string $method, string $param): array
+    {
+        $values = [];
+        switch ($service) {
+            case 'avatars':
+                switch ($method) {
+                    case 'getBrowser':
+                        $codes = Config::getParam('avatar-browsers');
+                        foreach ($codes as $code => $value) {
+                            $values[] = $value['name'];
+                        }
+                        return $values;
+                    case 'getCreditCard':
+                        $codes = Config::getParam('avatar-credit-cards');
+                        foreach ($codes as $code => $value) {
+                            $values[] = $value['name'];
+                        }
+                        return $values;
+                    case 'getFlag':
+                        $codes = Config::getParam('avatar-flags');
+                        foreach ($codes as $code => $value) {
+                            $values[] = $value['name'];
+                        }
+                        return $values;
+                }
+                break;
+            case 'databases':
+                switch ($method) {
+                    case 'getUsage':
+                    case 'getCollectionUsage':
+                    case 'getDatabaseUsage':
+                        // Range Enum Keys
+                        $values  = ['Twenty Four Hours', 'Seven Days', 'Thirty Days', 'Ninety Days'];
+                        return $values;
+                }
+                break;
+            case 'function':
+                switch ($method) {
+                    case 'getUsage':
+                    case 'getFunctionUsage':
+                        // Range Enum Keys
+                        $values = ['Twenty Four Hours', 'Seven Days', 'Thirty Days', 'Ninety Days'];
+                        return $values;
+                }
+                break;
+            case 'users':
+                switch ($method) {
+                    case 'getUsage':
+                    case 'getUserUsage':
+                        // Range Enum Keys
+                        if ($param == 'range') {
+                            $values = ['Twenty Four Hours', 'Seven Days', 'Thirty Days', 'Ninety Days'];
+                            return $values;
+                        }
+                }
+                break;
+            case 'storage':
+                switch ($method) {
+                    case 'getUsage':
+                    case 'getBucketUsage':
+                        // Range Enum Keys
+                        $values = ['Twenty Four Hours', 'Seven Days', 'Thirty Days', 'Ninety Days'];
+                        return $values;
+                }
+        }
+        return $values;
+    }
 }

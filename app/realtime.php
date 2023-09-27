@@ -1,11 +1,6 @@
 <?php
 
 use Appwrite\Auth\Auth;
-use Appwrite\Database\Adapter\Redis as RedisAdapter;
-use Appwrite\Database\Adapter\MySQL as MySQLAdapter;
-use Appwrite\Database\Database;
-use Appwrite\Database\Validator\Authorization;
-use Appwrite\Event\Event;
 use Appwrite\Messaging\Adapter\Realtime;
 use Appwrite\Network\Validator\Origin;
 use Appwrite\Utopia\Response;
@@ -18,14 +13,87 @@ use Utopia\Abuse\Abuse;
 use Utopia\Abuse\Adapters\TimeLimit;
 use Utopia\App;
 use Utopia\CLI\Console;
+use Utopia\Database\Helpers\ID;
+use Utopia\Database\Helpers\Role;
+use Utopia\Logger\Log;
+use Utopia\Database\DateTime;
+use Utopia\Database\Document;
+use Utopia\Database\Query;
+use Utopia\Database\Validator\Authorization;
+use Appwrite\Utopia\Request;
+use Utopia\Cache\Adapter\Sharding;
+use Utopia\Cache\Cache;
 use Utopia\Config\Config;
-use Utopia\Swoole\Request;
+use Utopia\Database\Database;
 use Utopia\WebSocket\Server;
 use Utopia\WebSocket\Adapter;
 
 require_once __DIR__ . '/init.php';
 
 Runtime::enableCoroutine(SWOOLE_HOOK_ALL);
+
+function getConsoleDB(): Database
+{
+    global $register;
+
+    /** @var \Utopia\Pools\Group $pools */
+    $pools = $register->get('pools');
+
+    $dbAdapter = $pools
+        ->get('console')
+        ->pop()
+        ->getResource()
+    ;
+
+    $database = new Database($dbAdapter, getCache());
+
+    $database->setNamespace('_console');
+
+    return $database;
+}
+
+function getProjectDB(Document $project): Database
+{
+    global $register;
+
+    /** @var \Utopia\Pools\Group $pools */
+    $pools = $register->get('pools');
+
+    if ($project->isEmpty() || $project->getId() === 'console') {
+        return getConsoleDB();
+    }
+
+    $dbAdapter = $pools
+        ->get($project->getAttribute('database'))
+        ->pop()
+        ->getResource()
+    ;
+
+    $database = new Database($dbAdapter, getCache());
+    $database->setNamespace('_' . $project->getInternalId());
+
+    return $database;
+}
+
+function getCache(): Cache
+{
+    global $register;
+
+    $pools = $register->get('pools'); /** @var \Utopia\Pools\Group $pools */
+
+    $list = Config::getParam('pools-cache', []);
+    $adapters = [];
+
+    foreach ($list as $value) {
+        $adapters[] = $pools
+            ->get($value)
+            ->pop()
+            ->getResource()
+        ;
+    }
+
+    return new Cache(new Sharding($adapters));
+}
 
 $realtime = new Realtime();
 
@@ -41,154 +109,133 @@ $stats->column('messages', Table::TYPE_INT);
 $stats->create();
 
 $containerId = uniqid();
-$documentId = null;
+$statsDocument = null;
+$workerNumber = swoole_cpu_num() * intval(App::getEnv('_APP_WORKER_PER_CORE', 6));
 
 $adapter = new Adapter\Swoole(port: App::getEnv('PORT', 80));
-$adapter->setPackageMaxLength(64000); // Default maximum Package Size (64kb)
+$adapter
+    ->setPackageMaxLength(64000) // Default maximum Package Size (64kb)
+    ->setWorkerNumber($workerNumber);
 
 $server = new Server($adapter);
 
-$server->onStart(function () use ($stats, $register, $containerId, &$documentId) {
-    Console::success('Server started succefully');
+$logError = function (Throwable $error, string $action) use ($register) {
+    $logger = $register->get('logger');
 
-    $getConsoleDb = function () use ($register) {
-        $db = $register->get('dbPool')->get();
-        $cache = $register->get('redisPool')->get();
+    if ($logger) {
+        $version = App::getEnv('_APP_VERSION', 'UNKNOWN');
 
-        $consoleDb = new Database();
-        $consoleDb->setAdapter(new RedisAdapter(new MySQLAdapter($db, $cache), $cache));
-        $consoleDb->setNamespace('app_console');
-        $consoleDb->setMocks(Config::getParam('collections', []));
+        $log = new Log();
+        $log->setNamespace("realtime");
+        $log->setServer(\gethostname());
+        $log->setVersion($version);
+        $log->setType(Log::TYPE_ERROR);
+        $log->setMessage($error->getMessage());
 
-        return [
-            $consoleDb,
-            function () use ($register, $db, $cache) {
-                $register->get('dbPool')->put($db);
-                $register->get('redisPool')->put($cache);
-            }
-        ];
-    };
+        $log->addTag('code', $error->getCode());
+        $log->addTag('verboseType', get_class($error));
+
+        $log->addExtra('file', $error->getFile());
+        $log->addExtra('line', $error->getLine());
+        $log->addExtra('trace', $error->getTraceAsString());
+        $log->addExtra('detailedTrace', $error->getTrace());
+
+        $log->setAction($action);
+
+        $isProduction = App::getEnv('_APP_ENV', 'development') === 'production';
+        $log->setEnvironment($isProduction ? Log::ENVIRONMENT_PRODUCTION : Log::ENVIRONMENT_STAGING);
+
+        $responseCode = $logger->addLog($log);
+        Console::info('Realtime log pushed with status code: ' . $responseCode);
+    }
+
+    Console::error('[Error] Type: ' . get_class($error));
+    Console::error('[Error] Message: ' . $error->getMessage());
+    Console::error('[Error] File: ' . $error->getFile());
+    Console::error('[Error] Line: ' . $error->getLine());
+};
+
+$server->error($logError);
+
+$server->onStart(function () use ($stats, $register, $containerId, &$statsDocument, $logError) {
+    sleep(5); // wait for the initial database schema to be ready
+    Console::success('Server started successfully');
 
     /**
      * Create document for this worker to share stats across Containers.
      */
-    go(function () use ($getConsoleDb, $containerId, &$documentId) {
-        try {
-            [$consoleDb, $returnConsoleDb] = call_user_func($getConsoleDb);
-            $document = [
-                '$collection' => Database::SYSTEM_COLLECTION_CONNECTIONS,
-                '$permissions' => [
-                    'read' => ['*'],
-                    'write' => ['*'],
-                ],
-                'container' => $containerId,
-                'timestamp' => time(),
-                'value' => '{}'
-            ];
-            Authorization::disable();
-            $document = $consoleDb->createDocument($document);
-            Authorization::enable();
-            $documentId = $document->getId();
-        } catch (\Throwable $th) {
-            Console::error('[Error] Type: ' . get_class($th));
-            Console::error('[Error] Message: ' . $th->getMessage());
-            Console::error('[Error] File: ' . $th->getFile());
-            Console::error('[Error] Line: ' . $th->getLine());
-        } finally {
-            call_user_func($returnConsoleDb);
-        }
+    go(function () use ($register, $containerId, &$statsDocument) {
+        $attempts = 0;
+        $database = getConsoleDB();
+
+        do {
+            try {
+                $attempts++;
+                $document = new Document([
+                    '$id' => ID::unique(),
+                    '$collection' => ID::custom('realtime'),
+                    '$permissions' => [],
+                    'container' => $containerId,
+                    'timestamp' => DateTime::now(),
+                    'value' => '{}'
+                ]);
+
+                $statsDocument = Authorization::skip(fn () => $database->createDocument('realtime', $document));
+                break;
+            } catch (\Throwable $th) {
+                Console::warning("Collection not ready. Retrying connection ({$attempts})...");
+                sleep(DATABASE_RECONNECT_SLEEP);
+            }
+        } while (true);
+        $register->get('pools')->reclaim();
     });
 
     /**
      * Save current connections to the Database every 5 seconds.
      */
-    Timer::tick(5000, function () use ($stats, $getConsoleDb, $containerId, &$documentId) {
-        foreach ($stats as $projectId => $value) {
-            if (empty($value['connections']) && empty($value['messages'])) {
-                continue;
-            }
-
-            $connections = $stats->get($projectId, 'connections');
-            $messages = $stats->get($projectId, 'messages');
-
-            $usage = new Event('v1-usage', 'UsageV1');
-            $usage
-                ->setParam('projectId', $projectId)
-                ->setParam('realtimeConnections', $connections)
-                ->setParam('realtimeMessages', $messages)
-                ->setParam('networkRequestSize', 0)
-                ->setParam('networkResponseSize', 0);
-
-            $stats->set($projectId, [
-                'messages' => 0,
-                'connections' => 0
-            ]);
-
-            if (App::getEnv('_APP_USAGE_STATS', 'enabled') == 'enabled') {
-                $usage->trigger();
-            }
-        }
+    Timer::tick(5000, function () use ($register, $stats, &$statsDocument, $logError) {
         $payload = [];
         foreach ($stats as $projectId => $value) {
-            if (!empty($value['connectionsTotal'])) {
-                $payload[$projectId] = $stats->get($projectId, 'connectionsTotal');
-            }
+            $payload[$projectId] = $stats->get($projectId, 'connectionsTotal');
         }
-        if (empty($payload)) {
+        if (empty($payload) || empty($statsDocument)) {
             return;
         }
 
         try {
-            [$consoleDb, $returnConsoleDb] = call_user_func($getConsoleDb);
+            $database = getConsoleDB();
 
-            $consoleDb->updateDocument([
-                '$id' => $documentId,
-                '$collection' => Database::SYSTEM_COLLECTION_CONNECTIONS,
-                '$permissions' => [
-                    'read' => ['*'],
-                    'write' => ['*'],
-                ],
-                'container' => $containerId,
-                'timestamp' => time(),
-                'value' => json_encode($payload)
-            ]);
+            $statsDocument
+                ->setAttribute('timestamp', DateTime::now())
+                ->setAttribute('value', json_encode($payload));
+
+            Authorization::skip(fn () => $database->updateDocument('realtime', $statsDocument->getId(), $statsDocument));
         } catch (\Throwable $th) {
-            Console::error('[Error] Type: ' . get_class($th));
-            Console::error('[Error] Message: ' . $th->getMessage());
-            Console::error('[Error] File: ' . $th->getFile());
-            Console::error('[Error] Line: ' . $th->getLine());
+            call_user_func($logError, $th, "updateWorkerDocument");
         } finally {
-            call_user_func($returnConsoleDb);
+            $register->get('pools')->reclaim();
         }
     });
 });
 
-$server->onWorkerStart(function (int $workerId) use ($server, $register, $stats, $realtime) {
-    Console::success('Worker ' . $workerId . ' started succefully');
+$server->onWorkerStart(function (int $workerId) use ($server, $register, $stats, $realtime, $logError) {
+    Console::success('Worker ' . $workerId . ' started successfully');
 
     $attempts = 0;
     $start = time();
 
-    Timer::tick(5000, function () use ($server, $register, $realtime, $stats) {
+    Timer::tick(5000, function () use ($server, $register, $realtime, $stats, $logError) {
         /**
          * Sending current connections to project channels on the console project every 5 seconds.
          */
-        if ($realtime->hasSubscriber('console', 'role:member', 'project')) {
-            $db = $register->get('dbPool')->get();
-            $cache = $register->get('redisPool')->get();
-
-            $consoleDb = new Database();
-            $consoleDb->setAdapter(new RedisAdapter(new MySQLAdapter($db, $cache), $cache));
-            $consoleDb->setNamespace('app_console');
-            $consoleDb->setMocks(Config::getParam('collections', []));
+        if ($realtime->hasSubscriber('console', Role::users()->toString(), 'project')) {
+            $database = getConsoleDB();
 
             $payload = [];
-            $list = $consoleDb->getCollection([
-                'filters' => [
-                    '$collection=' . Database::SYSTEM_COLLECTION_CONNECTIONS,
-                    'timestamp>' . (time() - 15)
-                ],
-            ]);
+
+            $list = Authorization::skip(fn () => $database->find('realtime', [
+                Query::greaterThan('timestamp', DateTime::addSeconds(new \DateTime(), -15)),
+            ]));
 
             /**
              * Aggregate stats across containers.
@@ -212,9 +259,9 @@ $server->onWorkerStart(function (int $workerId) use ($server, $register, $stats,
                     'project' => 'console',
                     'roles' => ['team:' . $stats->get($projectId, 'teamId')],
                     'data' => [
-                        'event' => 'stats.connections',
+                        'events' => ['stats.connections'],
                         'channels' => ['project'],
-                        'timestamp' => time(),
+                        'timestamp' => DateTime::formatTz(DateTime::now()),
                         'payload' => [
                             $projectId => $payload[$projectId]
                         ]
@@ -227,22 +274,21 @@ $server->onWorkerStart(function (int $workerId) use ($server, $register, $stats,
                 ]));
             }
 
-            $register->get('dbPool')->put($db);
-            $register->get('redisPool')->put($cache);
+            $register->get('pools')->reclaim();
         }
         /**
          * Sending test message for SDK E2E tests every 5 seconds.
          */
-        if ($realtime->hasSubscriber('console', 'role:guest', 'tests')) {
+        if ($realtime->hasSubscriber('console', Role::guests()->toString(), 'tests')) {
             $payload = ['response' => 'WS:/v1/realtime:passed'];
 
             $event = [
                 'project' => 'console',
-                'roles' => ['role:guest'],
+                'roles' => [Role::guests()->toString()],
                 'data' => [
-                    'event' => 'test.event',
+                    'events' => ['test.event'],
                     'channels' => ['tests'],
-                    'timestamp' => time(),
+                    'timestamp' => DateTime::formatTz(DateTime::now()),
                     'payload' => $payload
                 ]
             ];
@@ -263,8 +309,7 @@ $server->onWorkerStart(function (int $workerId) use ($server, $register, $stats,
             }
             $start = time();
 
-            /** @var Redis $redis */
-            $redis = $register->get('redisPool')->get();
+            $redis = $register->get('pools')->get('pubsub')->pop()->getResource(); /** @var Redis $redis */
             $redis->setOption(Redis::OPT_READ_TIMEOUT, -1);
 
             if ($redis->ping(true)) {
@@ -283,26 +328,18 @@ $server->onWorkerStart(function (int $workerId) use ($server, $register, $stats,
 
                     if ($realtime->hasSubscriber($projectId, 'user:' . $userId)) {
                         $connection = array_key_first(reset($realtime->subscriptions[$projectId]['user:' . $userId]));
-                    } else {
-                        return;
+                        $consoleDatabase = getConsoleDB();
+                        $project = Authorization::skip(fn() => $consoleDatabase->getDocument('projects', $projectId));
+                        $database = getProjectDB($project);
+
+                        $user = $database->getDocument('users', $userId);
+
+                        $roles = Auth::getRoles($user);
+
+                        $realtime->subscribe($projectId, $connection, $roles, $realtime->connections[$connection]['channels']);
+
+                        $register->get('pools')->reclaim();
                     }
-
-                    $db = $register->get('dbPool')->get();
-                    $cache = $register->get('redisPool')->get();
-
-                    $projectDB = new Database();
-                    $projectDB->setAdapter(new RedisAdapter(new MySQLAdapter($db, $cache), $cache));
-                    $projectDB->setNamespace('app_' . $projectId);
-                    $projectDB->setMocks(Config::getParam('collections', []));
-
-                    $user = $projectDB->getDocument($userId);
-
-                    $roles = Auth::getRoles($user);
-
-                    $realtime->subscribe($projectId, $connection, $roles, $realtime->connections[$connection]['channels']);
-
-                    $register->get('dbPool')->put($db);
-                    $register->get('redisPool')->put($cache);
                 }
 
                 $receivers = $realtime->getSubscribers($event);
@@ -326,55 +363,34 @@ $server->onWorkerStart(function (int $workerId) use ($server, $register, $stats,
                 }
             });
         } catch (\Throwable $th) {
-            Console::error('Pub/sub error: ' . $th->getMessage());
-            $register->get('redisPool')->put($redis);
-            $attempts++;
-            continue;
-        }
+            call_user_func($logError, $th, "pubSubConnection");
 
-        $attempts++;
+            Console::error('Pub/sub error: ' . $th->getMessage());
+            $attempts++;
+            sleep(DATABASE_RECONNECT_SLEEP);
+            continue;
+        } finally {
+            $register->get('pools')->reclaim();
+        }
     }
 
     Console::error('Failed to restart pub/sub...');
 });
 
-$server->onOpen(function (int $connection, SwooleRequest $request) use ($server, $register, $stats, &$realtime) {
+$server->onOpen(function (int $connection, SwooleRequest $request) use ($server, $register, $stats, &$realtime, $logError) {
     $app = new App('UTC');
     $request = new Request($request);
     $response = new Response(new SwooleResponse());
 
-    /** @var PDO $db */
-    $db = $register->get('dbPool')->get();
-    /** @var Redis $redis */
-    $redis = $register->get('redisPool')->get();
-
     Console::info("Connection open (user: {$connection})");
 
-    App::setResource('db', function () use (&$db) {
-        return $db;
-    });
-
-    App::setResource('cache', function () use (&$redis) {
-        return $redis;
-    });
-
-    App::setResource('request', function () use ($request) {
-        return $request;
-    });
-
-    App::setResource('response', function () use ($response) {
-        return $response;
-    });
+    App::setResource('pools', fn() => $register->get('pools'));
+    App::setResource('request', fn() => $request);
+    App::setResource('response', fn() => $response);
 
     try {
-        /** @var \Appwrite\Database\Document $user */
-        $user = $app->getResource('user');
-
-        /** @var \Appwrite\Database\Document $project */
+        /** @var \Utopia\Database\Document $project */
         $project = $app->getResource('project');
-
-        /** @var \Appwrite\Database\Document $console */
-        $console = $app->getResource('console');
 
         /*
          *  Project Check
@@ -383,20 +399,23 @@ $server->onOpen(function (int $connection, SwooleRequest $request) use ($server,
             throw new Exception('Missing or unknown project ID', 1008);
         }
 
+        $dbForProject = getProjectDB($project);
+        $console = $app->getResource('console'); /** @var \Utopia\Database\Document $console */
+        $user = $app->getResource('user'); /** @var \Utopia\Database\Document $user */
+
         /*
          * Abuse Check
          *
          * Abuse limits are connecting 128 times per minute and ip address.
          */
-        $timeLimit = new TimeLimit('url:{url},ip:{ip}', 128, 60, $db);
+        $timeLimit = new TimeLimit('url:{url},ip:{ip}', 128, 60, $dbForProject);
         $timeLimit
-            ->setNamespace('app_' . $project->getId())
             ->setParam('{ip}', $request->getIP())
             ->setParam('{url}', $request->getURI());
 
         $abuse = new Abuse($timeLimit);
 
-        if ($abuse->check() && App::getEnv('_APP_OPTIONS_ABUSE', 'enabled') === 'enabled') {
+        if (App::getEnv('_APP_OPTIONS_ABUSE', 'enabled') === 'enabled' && $abuse->check()) {
             throw new Exception('Too many requests', 1013);
         }
 
@@ -425,7 +444,7 @@ $server->onOpen(function (int $connection, SwooleRequest $request) use ($server,
 
         $realtime->subscribe($project->getId(), $connection, $roles, $channels);
 
-        $user = empty($user->getId()) ? null : $response->output($user, Response::MODEL_USER);
+        $user = empty($user->getId()) ? null : $response->output($user, Response::MODEL_ACCOUNT);
 
         $server->send([$connection], json_encode([
             'type' => 'connected',
@@ -442,6 +461,8 @@ $server->onOpen(function (int $connection, SwooleRequest $request) use ($server,
         $stats->incr($project->getId(), 'connections');
         $stats->incr($project->getId(), 'connectionsTotal');
     } catch (\Throwable $th) {
+        call_user_func($logError, $th, "initServer");
+
         $response = [
             'type' => 'error',
             'data' => [
@@ -458,38 +479,31 @@ $server->onOpen(function (int $connection, SwooleRequest $request) use ($server,
             Console::error('[Error] Code: ' . $response['data']['code']);
             Console::error('[Error] Message: ' . $response['data']['message']);
         }
-
-        if ($th instanceof PDOException) {
-            $db = null;
-        }
     } finally {
-        /**
-         * Put used PDO and Redis Connections back into their pools.
-         */
-        $register->get('dbPool')->put($db);
-        $register->get('redisPool')->put($redis);
+        $register->get('pools')->reclaim();
     }
 });
 
 $server->onMessage(function (int $connection, string $message) use ($server, $register, $realtime, $containerId) {
     try {
+        $app = new App('UTC');
         $response = new Response(new SwooleResponse());
-        $db = $register->get('dbPool')->get();
-        $cache = $register->get('redisPool')->get();
+        $projectId = $realtime->connections[$connection]['projectId'];
+        $database = getConsoleDB();
 
-        $projectDB = new Database();
-        $projectDB->setAdapter(new RedisAdapter(new MySQLAdapter($db, $cache), $cache));
-        $projectDB->setNamespace('app_' . $realtime->connections[$connection]['projectId']);
-        $projectDB->setMocks(Config::getParam('collections', []));
+        if ($projectId !== 'console') {
+            $project = Authorization::skip(fn() => $database->getDocument('projects', $projectId));
+            $database = getProjectDB($project);
+        }
 
         /*
          * Abuse Check
          *
          * Abuse limits are sending 32 times per minute and connection.
          */
-        $timeLimit = new TimeLimit('url:{url},connection:{connection}', 32, 60, $db);
+        $timeLimit = new TimeLimit('url:{url},connection:{connection}', 32, 60, $database);
+
         $timeLimit
-            ->setNamespace('app_' . $realtime->connections[$connection]['projectId'])
             ->setParam('{connection}', $connection)
             ->setParam('{container}', $containerId);
 
@@ -506,7 +520,7 @@ $server->onMessage(function (int $connection, string $message) use ($server, $re
         }
 
         switch ($message['type']) {
-            /**
+                /**
              * This type is used to authenticate.
              */
             case 'authentication':
@@ -515,15 +529,15 @@ $server->onMessage(function (int $connection, string $message) use ($server, $re
                 }
 
                 $session = Auth::decodeSession($message['data']['session']);
-                Auth::$unique = $session['id'];
-                Auth::$secret = $session['secret'];
+                Auth::$unique = $session['id'] ?? '';
+                Auth::$secret = $session['secret'] ?? '';
 
-                $user = $projectDB->getDocument(Auth::$unique);
+                $user = $database->getDocument('users', Auth::$unique);
+                $authDuration = $project->getAttribute('auths', [])['duration'] ?? Auth::TOKEN_EXPIRATION_LOGIN_LONG;
 
                 if (
                     empty($user->getId()) // Check a document has been found in the DB
-                    || Database::SYSTEM_COLLECTION_USERS !== $user->getCollection() // Validate returned document is really a user document
-                    || !Auth::sessionVerify($user->getAttribute('sessions', []), Auth::$secret) // Validate user has valid login token
+                    || !Auth::sessionVerify($user->getAttribute('sessions', []), Auth::$secret, $authDuration) // Validate user has valid login token
                 ) {
                     // cookie not valid
                     throw new Exception('Session is not valid.', 1003);
@@ -533,7 +547,7 @@ $server->onMessage(function (int $connection, string $message) use ($server, $re
                 $channels = Realtime::convertChannels(array_flip($realtime->connections[$connection]['channels']), $user->getId());
                 $realtime->subscribe($realtime->connections[$connection]['projectId'], $connection, $roles, $channels);
 
-                $user = $response->output($user, Response::MODEL_USER);
+                $user = $response->output($user, Response::MODEL_ACCOUNT);
                 $server->send([$connection], json_encode([
                     'type' => 'response',
                     'data' => [
@@ -547,7 +561,6 @@ $server->onMessage(function (int $connection, string $message) use ($server, $re
 
             default:
                 throw new Exception('Message type is not valid.', 1003);
-                break;
         }
     } catch (\Throwable $th) {
         $response = [
@@ -564,8 +577,7 @@ $server->onMessage(function (int $connection, string $message) use ($server, $re
             $server->close($connection, $th->getCode());
         }
     } finally {
-        $register->get('dbPool')->put($db);
-        $register->get('redisPool')->put($cache);
+        $register->get('pools')->reclaim();
     }
 });
 

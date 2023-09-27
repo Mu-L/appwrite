@@ -16,24 +16,36 @@ class File extends Model
                 'default' => '',
                 'example' => '5e5ea5c16897e',
             ])
+            ->addRule('bucketId', [
+                'type' => self::TYPE_STRING,
+                'description' => 'Bucket ID.',
+                'default' => '',
+                'example' => '5e5ea5c16897e',
+            ])
+            ->addRule('$createdAt', [
+                'type' => self::TYPE_DATETIME,
+                'description' => 'File creation date in ISO 8601 format.',
+                'default' => '',
+                'example' => self::TYPE_DATETIME_EXAMPLE,
+            ])
+            ->addRule('$updatedAt', [
+                'type' => self::TYPE_DATETIME,
+                'description' => 'File update date in ISO 8601 format.',
+                'default' => '',
+                'example' => self::TYPE_DATETIME_EXAMPLE,
+            ])
             ->addRule('$permissions', [
-                'type' => Response::MODEL_PERMISSIONS,
-                'description' => 'File permissions.',
-                'default' => new \stdClass,
-                'example' => new \stdClass,
-                'array' => false,
+                'type' => self::TYPE_STRING,
+                'description' => 'File permissions. [Learn more about permissions](/docs/permissions).',
+                'default' => [],
+                'example' => ['read("any")'],
+                'array' => true,
             ])
             ->addRule('name', [
                 'type' => self::TYPE_STRING,
                 'description' => 'File name.',
                 'default' => '',
                 'example' => 'Pink.png',
-            ])
-            ->addRule('dateCreated', [
-                'type' => self::TYPE_INTEGER,
-                'description' => 'File creation date in Unix timestamp.',
-                'default' => 0,
-                'example' => 1592981250,
             ])
             ->addRule('signature', [
                 'type' => self::TYPE_STRING,
@@ -53,6 +65,18 @@ class File extends Model
                 'default' => 0,
                 'example' => 17890,
             ])
+            ->addRule('chunksTotal', [
+                'type' => self::TYPE_INTEGER,
+                'description' => 'Total number of chunks available',
+                'default' => 0,
+                'example' => 17890,
+            ])
+            ->addRule('chunksUploaded', [
+                'type' => self::TYPE_INTEGER,
+                'description' => 'Total number of chunks uploaded',
+                'default' => 0,
+                'example' => 17890,
+            ])
         ;
     }
 
@@ -61,17 +85,17 @@ class File extends Model
      *
      * @return string
      */
-    public function getName():string
+    public function getName(): string
     {
         return 'File';
     }
 
     /**
-     * Get Collection
+     * Get Type
      *
      * @return string
      */
-    public function getType():string
+    public function getType(): string
     {
         return Response::MODEL_FILE;
     }

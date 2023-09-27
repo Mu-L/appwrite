@@ -23,11 +23,11 @@ Once your SDK object is set, create any of the Appwrite service objects and choo
 
 ```kotlin
 val users = Users(client)
-val response = users.create(
+val user = users.create(
+    user = ID.unique(),
     email = "email@example.com",
     password = "password",
 )
-val json = response.body?.string()
 ```
 
 ### Full Example
@@ -35,6 +35,7 @@ val json = response.body?.string()
 ```kotlin
 import io.appwrite.Client
 import io.appwrite.services.Users
+import io.appwrite.ID
 
 suspend fun main() {
     val client = Client(context)
@@ -44,11 +45,11 @@ suspend fun main() {
       .setSelfSigned(true) // Use only on dev mode with a self-signed SSL cert
 
     val users = Users(client)
-    val response = users.create(
+    val user = users.create(
+        user = ID.unique(),
         email = "email@example.com",
         password = "password",
     )
-    val json = response.body?.string()
 }
 ```
 
@@ -58,19 +59,19 @@ The Appwrite Kotlin SDK raises `AppwriteException` object with `message`, `code`
 
 ```kotlin
 import io.appwrite.Client
+import io.appwrite.ID
 import io.appwrite.services.Users
 
 suspend fun main() {
     val users = Users(client)
     try {
-        val response = users.create(
+        val user = users.create(
+            user = ID.unique(),
             email = "email@example.com",
             password = "password",
         )
-        var jsonString = response.body?.string() ?: ""
-
     } catch (e: AppwriteException) {
-        println(e)
+        e.printStackTrace()
     }
 }
 ```
